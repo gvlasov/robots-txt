@@ -12,6 +12,9 @@ class RobotsTxt
 
     protected array $crawlDelaysPerUserAgent = [];
 
+    /** @var UserAgentRuleGroup[] */
+    protected array $userAgentRuleGroups = [];
+
     protected bool $matchExactly = true;
 
     protected bool $includeGlobalGroup = true;
@@ -56,6 +59,7 @@ class RobotsTxt
         $this->disallowsPerUserAgent = $this->getDisallowsPerUserAgent($content);
         $this->allowsPerUserAgent = $this->getAllowsPerUserAgent($content);
         $this->crawlDelaysPerUserAgent = $this->getCrawlDelaysPerUserAgent($content);
+        $this->userAgentRuleGroups = $this->getRulesPerUserAgent($content);
     }
 
     public static function create(string $source): self
@@ -171,6 +175,28 @@ class RobotsTxt
         }
 
         return null;
+    }
+
+    /**
+     * @param string $userAgent
+     * @return UserAgentRuleGroup[]
+     */
+    public function userAgentRules(string $userAgent): array {
+
+        $normalizedUserAgent = strtolower(trim($userAgent));
+
+        $groups = [];
+        foreach ($this->userAgentRuleGroups as $group) {
+            if (
+                $group->userAgent === $normalizedUserAgent
+                || $this->includeGlobalGroup
+                && $group->userAgent === '*'
+            ) {
+                $groups[] = $group;
+            }
+        }
+
+        return $groups;
     }
 
     protected function pathMatchWeight(string $requestUri, array $itemsPerUseragent): int
@@ -427,6 +453,56 @@ class RobotsTxt
         }
 
         return $crawlDelaysPerUserAgent;
+    }
+
+    protected function getRulesPerUserAgent(string $content): array
+    {
+        $lines = explode(PHP_EOL, $content);
+
+        $lines = array_filter($lines);
+
+        $rulesPerUserAgent = [];
+
+        $currentUserAgents = [];
+        $isUserAgentListGoing = false;
+
+        foreach ($lines as $line) {
+            if ($this->isComment($line)) {
+                continue;
+            }
+
+            if ($this->isEmptyLine($line)) {
+                continue;
+            }
+
+            if ($this->isUserAgentLine($line)) {
+                if (! $isUserAgentListGoing) {
+                    $isUserAgentListGoing = true;
+                    $currentUserAgents = [];
+                }
+                $userAgent = $this->parseUserAgent($line);
+
+                $currentUserAgents[] = $userAgent;
+
+                continue;
+            }
+            $isUserAgentListGoing = false;
+
+            $lineParts = explode(':', $line);
+            $rule = new UserAgentRule(trim($lineParts[0]), trim($lineParts[1]));
+            foreach ($currentUserAgents as $currentUserAgent) {
+                $rulesPerUserAgent[$currentUserAgent][] = $rule;
+            }
+
+        }
+
+        $result = [];
+
+        foreach ($rulesPerUserAgent as $userAgent => $rules) {
+            $result[] = new UserAgentRuleGroup($userAgent, $rules);
+        }
+
+        return $result;
     }
 
     protected function isComment(string $line): bool
