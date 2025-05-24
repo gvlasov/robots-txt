@@ -488,7 +488,7 @@ class RobotsTxt
             }
             $isUserAgentListGoing = false;
 
-            $lineParts = explode(':', $line);
+            $lineParts = $this->explode_once(':', $line);
             $rule = new UserAgentRule(trim($lineParts[0]), trim($lineParts[1]));
             foreach ($currentUserAgents as $currentUserAgent) {
                 $rulesPerUserAgent[$currentUserAgent][] = $rule;
@@ -503,6 +503,18 @@ class RobotsTxt
         }
 
         return $result;
+    }
+
+    function explode_once(string $delimiter, string $string): array {
+        $pos = strpos($string, $delimiter);
+        if ($pos === false) {
+            return [$string];
+        }
+
+        return [
+            substr($string, 0, $pos),
+            substr($string, $pos + strlen($delimiter))
+        ];
     }
 
     protected function isComment(string $line): bool

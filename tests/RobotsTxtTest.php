@@ -517,4 +517,20 @@ class RobotsTxtTest extends TestCase
         $groups = $robots->userAgentRules('google');
         $this->assertCount(0, $groups);
     }
+
+    /** @test */
+    public function it_handles_user_agent_rules_with_colon_in_value() {
+        $robots = (new RobotsTxt(
+            '
+            User-agent: google
+            Sitemap: https://site.com/sitemap.xml
+        '
+        ));
+        $groups = $robots->userAgentRules('google');
+        $this->assertCount(1, $groups);
+        $this->assertEquals('google', $groups[0]->userAgent);
+        $this->assertCount(1, $groups[0]->rules);
+        $this->assertEquals('Sitemap', $groups[0]->rules[0]->name);
+        $this->assertEquals('https://site.com/sitemap.xml', $groups[0]->rules[0]->value);
+    }
 }
